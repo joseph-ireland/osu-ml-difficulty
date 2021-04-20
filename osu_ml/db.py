@@ -35,7 +35,7 @@ class User(BaseModel):
         return self.replays.count() // config.REPLAYS_PER_BATCH
 
     def replay_batch(self, i, batch_size=config.REPLAYS_PER_BATCH):
-        return self.replays.order_by(Replay.timestamp).paginate(i, batch_size)
+        return replay_batch(self.id, i, batch_size)
 
 def replay_batch(user_id, i, batch_size=config.REPLAYS_PER_BATCH):
     return Replay.select().where(Replay.user == user_id).order_by(Replay.timestamp).paginate(i, batch_size)
