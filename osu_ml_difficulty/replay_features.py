@@ -9,7 +9,7 @@ from osu_ml_difficulty import db, beatmap
 from osu_ml_difficulty import frame
 
 
-@numba.njit()
+@numba.njit(cache=True)
 def hit_object_clicks(clicks, hit_objects):
     n_hit_objects = hit_objects.shape[0]
     result = np.full((hit_objects.shape[0], clicks.shape[1]), np.nan, dtype="f")
