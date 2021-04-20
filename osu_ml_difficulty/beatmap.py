@@ -5,9 +5,9 @@ import numpy as np
 import slider
 from slider.mod import circle_radius
 
-from osu_ml import config
-from osu_ml.pickle_memoize import pickle_memoize
-from osu_ml import frame
+from osu_ml_difficulty import config
+from osu_ml_difficulty.pickle_memoize import pickle_memoize
+from osu_ml_difficulty import frame
 
 
 lib = slider.Library(config.OSU_MAP_PATH, cache=128)

@@ -12,8 +12,8 @@ from patoolib import extract_archive
 from peewee import fn
 import numpy as np
 
-from osu_ml import db, config
-from osu_ml.fast_replay import FastReplay, GameModeNotSupported
+from osu_ml_difficulty import db, config
+from osu_ml_difficulty.fast_replay import FastReplay, GameModeNotSupported
 
 
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1lpTCKNPoE2ikUN6liXjOcUgvnE7ePR8HDFD77YZe-rg/edit?usp=sharing"

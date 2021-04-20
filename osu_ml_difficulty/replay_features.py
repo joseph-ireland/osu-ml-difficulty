@@ -5,8 +5,8 @@ from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 import numba
 
-from osu_ml import db, beatmap
-from osu_ml import frame
+from osu_ml_difficulty import db, beatmap
+from osu_ml_difficulty import frame
 
 
 @numba.njit()

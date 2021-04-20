@@ -4,7 +4,7 @@ import numpy as np
 import peewee as pw
 from slider.mod import Mod
 
-from  osu_ml import config
+from  osu_ml_difficulty import config
 
 
 

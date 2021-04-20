@@ -420,7 +420,7 @@ contextmanager-decorators=contextlib.contextmanager
 # List of members which are set dynamically and missed by pylint inference
 # system, and so shouldn't trigger E1101 when accessed. Python regular
 # expressions are accepted.
-generated-members=osu_ml.db.User.replays,
+generated-members=osu_ml_difficulty.db.User.replays,
       id,
       gdrive_service.*
 

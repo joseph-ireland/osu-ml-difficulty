@@ -1,6 +1,6 @@
 import numpy as np
 
-from osu_ml import raleigh
+from osu_ml_difficulty import raleigh
 
 
 _z0 = raleigh.CDF_inv(0.96)

@@ -43,5 +43,4 @@ def fit():
     m.save("model.keras")
 
 if __name__=="__main__":
-
     fit()
