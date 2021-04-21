@@ -1,73 +1,34 @@
-from urllib.parse import urlparse, parse_qs
-import io
+"""
+Import replay files and store in binary format
+"""
+
 import os
 from concurrent.futures import ProcessPoolExecutor
 import logging
 
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload
-from patoolib import extract_archive
 from peewee import fn
 import numpy as np
+import pandas as pd
 
 from osu_ml_difficulty import db, config
 from osu_ml_difficulty.fast_replay import FastReplay, GameModeNotSupported
 
-
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1lpTCKNPoE2ikUN6liXjOcUgvnE7ePR8HDFD77YZe-rg/edit?usp=sharing"
-CRED_PATH = "../secrets/replay_data_gdrive_credentials.json"
-scope = ["https://spreadsheets.google.com/feeds", "https://googleapis.com/auth/drive"]
-
-download_path = os.path.join(config.DATA_PATH, "replay_downloads")
+USERS_FILENAME = os.path.join(config.DOWNLOAD_PATH, "users.csv")
 
 
-creds = ServiceAccountCredentials.from_json_keyfile_name(CRED_PATH)
-gdrive_service = build("drive", "v3", credentials=creds)
-gspread_service = gspread.authorize(creds)
-
-def download_replays(user, url):
-    extract_path = os.path.join(download_path, user.username)
-    if not os.path.exists(extract_path):
-        fileId = parse_qs(urlparse(url).query)["id"][0]
-        metadata = gdrive_service.files().get(fileId=fileId).execute()
-        _, extension = os.path.splitext(metadata["name"])
-        filepath = os.path.join(download_path, user.username + extension)
-
-        if not os.path.isfile(filepath):
-            request = gdrive_service.files().get_media(fileId=fileId)
-
-            with io.FileIO(filepath+".tmp", mode='wb') as fh:
-                downloader = MediaIoBaseDownload(fh, request)
-
-                done = False
-                print(f"Downloading {filepath}")
-
-                while done is False:
-                    status, done = downloader.next_chunk()
-                    if status:
-                        print(f"Downloading {filepath}: {int(status.progress()*100)}%.")
-            os.rename(filepath+".tmp", filepath)
-
-        extract_archive(filepath, outdir=extract_path)
-
-    parse_replays(extract_path, user)
-
-
-def download_responses():
-    responses = gspread_service.open_by_url(SHEET_URL).get_worksheet(0).get_all_records()
+def import_users():
+    responses = pd.read_csv(USERS_FILENAME)
 
     db.init_db()
 
     with db.db:
         for user in db.User.select():
-            if user.username != responses[user.id]["username"]:
+            if user.username != responses["username"][user.id]:
                 raise RuntimeError("Mismatch between database and response form")
 
         next_row = db.User.select().count()
 
-        for i, row in enumerate(responses[next_row:], next_row):
+        for i, row in responses[next_row:].iterrows():
             user = db.User.create(
                 id=i,
                 username=row["username"],
@@ -78,15 +39,19 @@ def download_responses():
                 history_completeness=row["history_completeness"]
                 )
 
-        users = [u for u in db.User.select().where(
+        pending_users = [u for u in db.User.select().where(
             ~fn.EXISTS(
                 db.Replay.select(1).where(db.User.id == db.Replay.user)
             )
         )]
 
-    for user in users:
-        replay_url = responses[user.id]["replays_url"]
-        download_replays(user, replay_url)
+    return pending_users, responses
+
+def import_replays():
+    pending_users, _ = import_users()
+
+    for user in pending_users:
+        parse_replays(user)
 
 
 def replay_paths(replay_dir):
@@ -104,7 +69,9 @@ def parse_replay(replay_path):
         logging.exception("error parsing replay")
         return None
 
-def parse_replays(path, user, processes=4):
+def parse_replays(user, processes=4):
+    path = os.path.join(config.DOWNLOAD_PATH, user.username)
+
     with db.db:
         i=0
         with ProcessPoolExecutor(processes) as executor:
@@ -132,4 +99,4 @@ def parse_replays(path, user, processes=4):
 
 
 if __name__ == "__main__":
-    download_responses()
+    import_replays()
