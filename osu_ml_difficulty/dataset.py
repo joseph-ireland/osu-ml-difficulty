@@ -9,14 +9,15 @@ from . import db, frame
 
 class AugmentedBeatmapColumns(IntEnum):
     DELTA_T = 0
-    DISTANCE = 1
-    RELATIVE_DELTA_X = 2
-    RELATIVE_DELTA_Y = 3
-    #FITTS_DIFFICULTY = 4
-    N_COLUMNS = 4
+    FREQUENCY = 1
+    DISTANCE = 2
+    VELOCITY = 3
+    DELTA_X = 4
+    DELTA_Y = 5
+    N_COLUMNS = 6
 
-def fitts_difficulty(dist, time):
-    return 0.1*dist / (np.exp2(time)-0.999)
+def difficulty_estimate(dist, time):
+    return 0.1 * (dist / time)
 
 
 def linear_fit(x, y):
@@ -35,9 +36,9 @@ def augment_beatmap_data(map_data):
     pos = map_data.hit_objects[:,frame.POS] * map_data.scale
     time = map_data.hit_objects[:,frame.TIME] * 1e-3
     delta_pos = np.diff(pos, axis=0)
-    delta_t = np.diff(time, axis=0)
+    delta_t = np.maximum(np.diff(time, axis=0),0.001)
+    freq = 1 / delta_t
     distances = np.linalg.norm(delta_pos, axis=-1)
-    #fitts = fitts_difficulty(distances, delta_t)
     zero_distance_mask = np.abs(distances) < 0.05
     directions = delta_pos / distances[:,None]
     directions[zero_distance_mask] = np.array([[1,0]])
@@ -50,17 +51,20 @@ def augment_beatmap_data(map_data):
     relative_delta_y = np.einsum("...i,...i", perpendicular_direction[:-1], delta_pos[1:])
 
 
-    data = np.zeros((delta_t.shape[0], 4,AugmentedBeatmapColumns.N_COLUMNS), dtype="float32")
+    data = np.zeros((delta_t.shape[0], 5,AugmentedBeatmapColumns.N_COLUMNS), dtype="float32")
     data[:, 2, AugmentedBeatmapColumns.DELTA_T] = delta_t
+    data[:, 2, AugmentedBeatmapColumns.FREQUENCY] = freq
     data[:, 2, AugmentedBeatmapColumns.DISTANCE] = distances
-    data[1:, 2, AugmentedBeatmapColumns.RELATIVE_DELTA_X] = relative_delta_x
-    data[1:, 2, AugmentedBeatmapColumns.RELATIVE_DELTA_Y] =  relative_delta_y
-    #data[:, 2, AugmentedBeatmapColumns.FITTS_DIFFICULTY] =  fitts
+    data[:, 2, AugmentedBeatmapColumns.VELOCITY] = distances * freq
+
+    data[1:, 2, AugmentedBeatmapColumns.DELTA_X] = relative_delta_x
+    data[1:, 2, AugmentedBeatmapColumns.DELTA_Y] =  relative_delta_y
 
     # add data for previous 2 and next 2
     data[2:,0,:] = data[:-2,2,:]
     data[1:,1,:] = data[:-1,2,:]
     data[:-1,3,:] = data[1:,2,:]
+    data[:-2,4,:] = data[2:,2,:]
 
     return data
 
@@ -95,12 +99,12 @@ def user_batch_dataset(user_id, batch):
         hit_object_data = hit_object_data[mask]
         hit_errors = hit_errors[mask]
 
-        hit_object_difficulty = fitts_difficulty(hit_object_data[:,2,AugmentedBeatmapColumns.DISTANCE],hit_object_data[:,2,AugmentedBeatmapColumns.DELTA_T])
-
+        hit_object_difficulty = difficulty_estimate(hit_object_data[:,2,AugmentedBeatmapColumns.DISTANCE],hit_object_data[:,2,AugmentedBeatmapColumns.DELTA_T])
+        #hit_object_difficulty = hit_object_data[:,2,AugmentedBeatmapColumns.FITTS_DIFFICULTY]
         m, c = linear_fit(hit_errors, hit_object_difficulty)
         implied_difficulty = (hit_errors-c)/m
         return (hit_object_data, implied_difficulty)
-    return (tf.constant([],shape=(0,4,AugmentedBeatmapColumns.N_COLUMNS), dtype="float32"), tf.constant([], shape=(0,),dtype="float32"))
+    return (tf.constant([],shape=(0,5,AugmentedBeatmapColumns.N_COLUMNS), dtype="float32"), tf.constant([], shape=(0,),dtype="float32"))
 
 def wrapped_user_batch_dataset(user_batch):
     def func(user_batch):
@@ -113,7 +117,7 @@ def wrapped_user_batch_dataset(user_batch):
     )
 
     return (
-        tf.ensure_shape(py_func[0], (None,4,AugmentedBeatmapColumns.N_COLUMNS)),
+        tf.ensure_shape(py_func[0], (None,5,AugmentedBeatmapColumns.N_COLUMNS)),
         tf.ensure_shape(py_func[1], (None,))
     )
 

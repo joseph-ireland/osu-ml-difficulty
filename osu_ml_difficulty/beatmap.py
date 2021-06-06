@@ -34,7 +34,7 @@ class MapData:
         return result
 
     @classmethod
-    def from_beatmap(cls, beatmap: slider.Beatmap, dt, hd, hr, ez, ht):
+    def from_beatmap(cls, beatmap: slider.Beatmap, dt=False, hd=False, hr=False, ez=False, ht=False):
         return cls(
             hit_objects = np.array([
                 (h.time.total_seconds()*1e3, h.position.x, h.position.y)
