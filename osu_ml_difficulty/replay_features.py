@@ -1,6 +1,5 @@
 import os
 import logging
-from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 import numba
@@ -72,7 +71,7 @@ def calculate_replay_features(replay: db.Replay):
     return features
 
 
-def calculate_all_replay_features(skip_exceptions=True):
+def calculate_all_replay_features(force=False, skip_exceptions=True):
     with db.db:
         processed = 0
         progress = 0
@@ -82,7 +81,7 @@ def calculate_all_replay_features(skip_exceptions=True):
         print()
         for replay in db.Replay.select():
             progress += 1
-            if not os.path.exists(replay.feature_path()):
+            if force or not os.path.exists(replay.feature_path()):
                 try:
                     if calculate_replay_features(replay) is not None:
                         processed += 1
